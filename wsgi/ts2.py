@@ -1,5 +1,9 @@
 
 import os
+import requests
+import zipfile
+import StringIO
+import json
 
 from flask import Flask, jsonify, request
 from flask.ext.sqlalchemy import SQLAlchemy
@@ -82,11 +86,32 @@ def auth_su(req):
 
 @app.route("/")
 def index():
-    return jsonify(info="Hello TS2!",
+    return jsonify(info="Hello TS2",
                 remote_addr=request.headers.get('x-forwarded-for')
     )
 
+@app.route("/pull_git_zip")
+def pull_git_zip():
+    if not auth_su(request):
+        return jsonify(error="No Auth")
 
+    r = requests.get('https://github.com/ts2/ts2-data/archive/master.zip')
+    #r = requests.get('http://localhost/~ts2/ts2-data-master.zip')
+    zippy = zipfile.ZipFile(StringIO.StringIO(r.content))
+
+    meta = []
+    for filename in zippy.namelist():
+        if filename.endswith(".ts2") or filename.endswith(".json"):
+            print filename
+            data = json.loads( zippy.read(filename) )
+            print data.keys()
+            meta.append( data['options'] )
+
+    return jsonify(success=True, meta = meta)
+
+
+# ==============================================
+# Datanase Stuff
 @app.route("/db/create")
 def db_create():
     if not auth_su(request):
