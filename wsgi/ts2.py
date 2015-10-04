@@ -4,10 +4,14 @@ import requests
 import zipfile
 import StringIO
 import json
+import hashlib
+import datetime
 
 from flask import Flask, jsonify, request
 from flask.ext.sqlalchemy import SQLAlchemy
+from sqlalchemy.sql import text
 
+LOCAL = bool(os.environ.get('__TS2_DEV__'))
 
 
 # temp hack to load etc
@@ -29,10 +33,10 @@ db = SQLAlchemy(app)
 class Sim(db.Model):
     __tablename__ = 'sims'
     sim_id = db.Column(db.Integer, primary_key=True)
-    title = db.Column(db.String(80))
+    filename = db.Column(db.String(120))
+    title = db.Column(db.String(120))
     description = db.Column(db.Text())
-    version = db.Column(db.Integer)
-
+    curr_version = db.Column(db.String(10))
 
     def __repr__(self):
         return '<Sim %r>' % self.title
@@ -44,11 +48,12 @@ class SimData(db.Model):
     sim_id = db.Column(db.Integer)
     data = db.Column(db.Text)
     hash = db.Column(db.String(120))
-    version = db.Column(db.Integer)
-
+    data_version = db.Column(db.String(10))
+    dated = db.Column(db.DateTime())
+    source = db.Column(db.String(50))
 
     def __repr__(self):
-        return '<Sim %r>' % self.title
+        return '<SimData %r>' % self.data_version
 
 
 class User(db.Model):
@@ -95,38 +100,85 @@ def pull_git_zip():
     if not auth_su(request):
         return jsonify(error="No Auth")
 
-    r = requests.get('https://github.com/ts2/ts2-data/archive/master.zip')
-    #r = requests.get('http://localhost/~ts2/ts2-data-master.zip')
+    ## Fetch remote zip
+    url = 'http://localhost/~ts2/ts2-data-master.zip' if LOCAL else 'https://github.com/ts2/ts2-data/archive/master.zip'
+    r = requests.get(url)
     zippy = zipfile.ZipFile(StringIO.StringIO(r.content))
 
-    meta = []
-    for filename in zippy.namelist():
-        if filename.endswith(".ts2") or filename.endswith(".json"):
-            print filename
-            data = json.loads( zippy.read(filename) )
-            print data.keys()
-            meta.append( data['options'] )
+    imported = 0
+    updated = 0
+    files_list = []
+    for filepath in zippy.namelist():
+        if filepath.endswith(".ts2") or filepath.endswith(".json"):
+            filename = os.path.basename(filepath)
+            files_list.append(filename)
+            data = json.loads( zippy.read(filepath) )
+            opts =  data['options']
 
-    return jsonify(success=True, meta = meta)
+            sim_blob = json.dumps(data, sort_keys=True, indent=4)
+            sha = hashlib.sha1()
+            sha.update(sim_blob)
+            hash = sha.hexdigest()
+
+            sim = db.session.query(Sim).filter_by(filename=filename).first()
+            if sim == None:
+                sim = Sim()
+                sim.filename = filename
+                db.session.add(sim)
+
+
+            sim.title = opts['title']
+            sim.description = opts['description']
+            db.session.commit()
+
+            simdata = db.session.query(SimData).filter_by(sim_id=sim.sim_id, hash=hash).order_by(SimData.data_version.desc()).first()
+            if simdata == None:
+                simdata = SimData()
+                simdata.sim_id = sim.sim_id
+                db.session.add(simdata)
+                imported += 1
+            else:
+                updated += 1
+            simdata.data = sim_blob
+
+            simdata.hash = hash
+            simdata.data_version = opts['version']
+            simdata.dated = datetime.datetime.utcnow()
+            simdata.source = "ts2-data-master.zip"
+            db.session.commit()
+
+
+
+
+    return jsonify(success=True, files_list = sorted(files_list), updated=updated,  imported=imported)
 
 
 # ==============================================
-# Datanase Stuff
+# Database Stuff
 @app.route("/db/create")
 def db_create():
     if not auth_su(request):
         return jsonify(error="No Auth")
+    db.drop_all()
     db.create_all()
     return jsonify(success=True)
 
 @app.route("/db/tables")
 def db_tables():
+
+    sql_cols = text("select column_name, ordinal_position, data_type, is_nullable from INFORMATION_SCHEMA.COLUMNS where table_name = :table")
+
+
     sql = "SELECT table_name FROM  INFORMATION_SCHEMA.tables "
     sql += "WHERE  table_type = 'BASE TABLE' AND table_schema NOT IN ('pg_catalog', 'information_schema');"
     result = db.session.execute(sql)
     tables = []
     for row in result:
-        tables.append(row[0])
+        cols = []
+        result_cols = db.session.execute(sql_cols, dict(table=row[0]))
+        for crow in result_cols:
+            cols.append( dict(name=crow[0], type=crow[2], nullable=crow[3] == "YES"))
+        tables.append( dict(table=row[0], cols=cols) )
     return jsonify(success=True, tables=tables)
 
 
@@ -135,6 +187,9 @@ def db_tables():
 # =======================================================
 ## Run Local
 if __name__ == "__main__":
+
+    ### Run this with fabric in root dir as it sets environment. `fab run`
+
     app.debug = True
-    app.run()
+    app.run(port=5555)
 
