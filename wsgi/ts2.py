@@ -9,7 +9,7 @@ from flask.ext.sqlalchemy import SQLAlchemy
 # temp hack to load etc
 ALLOWED_IPS = [
     "127.0.0.1",
-    "84.45.225.281"
+    "84.45.225.28"
 ]
 
 app = Flask(__name__)
