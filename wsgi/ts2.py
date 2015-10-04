@@ -30,7 +30,11 @@ class User(db.Model):
 
 @app.route("/")
 def index():
-    return jsonify(info="Hello TS2!", ip=request.remote_addr)
+    return jsonify(info="Hello TS2!",
+                remote_address=request.remote_addr,
+                HTTP_X_FORWARDED_FOR=request.headers.get('HTTP_X_FORWARDED_FOR'),
+                HTTP_X_CLIENT_IP=request.headers.get('HTTP_X_CLIENT_IP'),
+    )
 
 
 @app.route("/db/create")
