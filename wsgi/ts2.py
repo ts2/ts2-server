@@ -94,6 +94,20 @@ def db_create():
     db.create_all()
     return jsonify(success=True)
 
+@app.route("/db/tables")
+def db_tables():
+    sql = "SELECT table_name FROM  INFORMATION_SCHEMA.tables "
+    sql += "WHERE  table_type = 'BASE TABLE' AND table_schema NOT IN ('pg_catalog', 'information_schema');"
+    result = db.session.execute(sql)
+    tables = []
+    for row in result:
+        tables.append(row[0])
+    return jsonify(success=True, tables=tables)
+
+
+
+
+# =======================================================
 ## Run Local
 if __name__ == "__main__":
     app.debug = True
