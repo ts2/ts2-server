@@ -56,6 +56,7 @@ class SimData(db.Model):
         return '<SimData %r>' % self.data_version
 
 
+
 class User(db.Model):
     __tablename__ = 'users'
     id = db.Column(db.Integer, primary_key=True)
@@ -95,7 +96,31 @@ def index():
                 remote_addr=request.headers.get('x-forwarded-for')
     )
 
-@app.route("/pull_git_zip")
+@app.route("/ajax/sims")
+def ajax_sims():
+
+    sql = """
+    SELECT
+        sim_data.sim_data_id, sim_data.sim_id,
+        sims.filename, sims.title, sims.description,
+        sim_data.dated, sim_data.hash
+    FROM sim_data
+    inner join sims on sim_data.sim_id = sims.sim_id
+    where dated = (select max(dated) from sim_data where sim_data.sim_id = sims.sim_id)
+    order by sim_data.dated desc
+
+    """
+    result = db.session.execute(sql)
+    sims = []
+    for row in result:
+        sims.append( dict(filename=row[2], title=row[3], description=row[4],
+                          dated=row[5], hash=row[6]) )
+
+    return jsonify( sims=sims  )
+
+
+
+@app.route("/ajax/pull_git_zip")
 def pull_git_zip():
     if not auth_su(request):
         return jsonify(error="No Auth")
@@ -155,15 +180,46 @@ def pull_git_zip():
 
 # ==============================================
 # Database Stuff
-@app.route("/db/create")
-def db_create():
+@app.route("/ajax/db/create_tables")
+def db_create_tables():
     if not auth_su(request):
         return jsonify(error="No Auth")
     db.drop_all()
     db.create_all()
+
+    sql = """
+    CREATE OR REPLACE VIEW v_sims AS
+    SELECT
+        simdata.sim_data_id, simdata.sims.sim_id,
+        sims.filename, sims.title, sims.description,
+        simsdata.dated
+    FROM simdata
+    inner join sims on simdata.sim_id = sims.sim_id
+    where dated = (select max(dated) from simsdata where simdata.sim_id = sims.sim_id)
+    """
+
     return jsonify(success=True)
 
-@app.route("/db/tables")
+@app.route("/ajax/db/create_views")
+def db_create_views():
+
+
+    sql = """
+    CREATE OR REPLACE VIEW v_sims AS
+    SELECT
+        sim_data.sim_data_id, sim_data.sim_id,
+        sims.filename, sims.title, sims.description,
+        sim_data.dated
+    FROM sim_data
+    inner join sims on sim_data.sim_id = sims.sim_id
+    where dated = (select max(dated) from sim_data where sim_data.sim_id = sims.sim_id);
+    """
+    db.session.execute(sql)
+
+    return jsonify(success=True)
+
+
+@app.route("/ajax/db/tables")
 def db_tables():
 
     sql_cols = text("select column_name, ordinal_position, data_type, is_nullable from INFORMATION_SCHEMA.COLUMNS where table_name = :table")
