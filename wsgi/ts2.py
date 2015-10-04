@@ -1,3 +1,6 @@
+
+import os
+
 from flask import Flask, jsonify, request
 from flask.ext.sqlalchemy import SQLAlchemy
 
@@ -5,19 +8,51 @@ from flask.ext.sqlalchemy import SQLAlchemy
 
 # temp hack to load etc
 ALLOWED_IPS = [
-    "127.0.0.1"
+    "127.0.0.1",
+    "84.45.225.281"
 ]
 
 app = Flask(__name__)
+app.config['SQLALCHEMY_DATABASE_URI'] = os.environ['OPENSHIFT_POSTGRESQL_DB_URL']
+
 db = SQLAlchemy(app)
 
 
+# ===========================================
+# Models
+# ===========================================
+
+class Sim(db.Model):
+    __tablename__ = 'sims'
+    sim_id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(80))
+    description = db.Column(db.Text())
+    version = db.Column(db.Integer)
+
+
+    def __repr__(self):
+        return '<Sim %r>' % self.title
+
+
+class SimData(db.Model):
+    __tablename__ = 'sim_data'
+    sim_data_id = db.Column(db.Integer, primary_key=True)
+    sim_id = db.Column(db.Integer)
+    data = db.Column(db.Text)
+    hash = db.Column(db.String(120))
+    version = db.Column(db.Integer)
+
+
+    def __repr__(self):
+        return '<Sim %r>' % self.title
 
 
 class User(db.Model):
+    __tablename__ = 'users'
     id = db.Column(db.Integer, primary_key=True)
-    username = db.Column(db.String(80), unique=True)
+    username = db.Column(db.String(80))
     email = db.Column(db.String(120), unique=True)
+    password = db.Column(db.String(120))
 
     def __init__(self, username, email):
         self.username = username
@@ -28,17 +63,34 @@ class User(db.Model):
 
 
 
+
+def auth_su(req):
+    ip = req.headers.get('x-forwarded-for')
+    if ip == None:
+        return True # hack cos local
+
+    if ip in ALLOWED_IPS:
+        return True
+    return False
+
+
+
+# ===========================================
+# Handlers
+# ===========================================
+
+
 @app.route("/")
 def index():
     return jsonify(info="Hello TS2!",
-                remote_address=request.remote_addr,
-                HTTP_X_FORWARDED_FOR=request.headers.get('x-forwarded-for'),
-                HTTP_X_CLIENT_IP=request.headers.get('HTTP_X_CLIENT_IP'),
+                remote_addr=request.headers.get('x-forwarded-for')
     )
 
 
 @app.route("/db/create")
 def db_create():
+    if not auth_su(request):
+        return jsonify(error="No Auth")
     db.create_all()
     return jsonify(success=True)
 
