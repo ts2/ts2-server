@@ -32,7 +32,7 @@ class User(db.Model):
 def index():
     return jsonify(info="Hello TS2!",
                 remote_address=request.remote_addr,
-                HTTP_X_FORWARDED_FOR=request.headers.get('HTTP_X_FORWARDED_FOR'),
+                HTTP_X_FORWARDED_FOR=request.headers.get('x-forwarded-for'),
                 HTTP_X_CLIENT_IP=request.headers.get('HTTP_X_CLIENT_IP'),
     )
 
