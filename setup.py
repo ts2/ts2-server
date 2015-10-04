@@ -6,5 +6,5 @@ setup(name='ts2-server',
       author='Pedro Morgan',
       author_email='ts2@daffodil.uk.com',
       url='http://ts2.github.io/',
-      install_requires=['Flask>=0.7.2', 'MarkupSafe', 'Flask-SQLAlchemy'],
+      install_requires=['Flask>=0.7.2', 'MarkupSafe', 'Flask-SQLAlchemy', 'Requests'],
      )
