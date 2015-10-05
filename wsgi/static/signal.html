@@ -1,4 +1,4 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
 	<meta charset="utf-8">
@@ -13,7 +13,9 @@
 
 <div data-role="page">
 	<div data-role="header" data-theme="b">
+		
 		<h1>Siganl Demo</h1>
+		
 	</div>
 	<div role="main" class="ui-content">		
 		<svg  xmlns="http://www.w3.org/2000/svg" height="300"
@@ -31,19 +33,24 @@
 			<text x="50" y="260" font-family="monospace" id="text"
 			style="fill: #dddddd; stroke: none; font-size: 24px; text-anchor: middle">H2301</text>
 		</svg>
-
+                <label><input type="checkbox" id="pause" value="1">Pause</label>
+                <input type="range" name="zoom" id="zoom" value="100" min="10" max="150" step="5" highlight="true" />
 	</div>
 	<div data-role="footer">
 		<div data-role="controlgroup" data-type="horizontal">
 			<input type="radio" name="set_color" value="red" id="red" ><label for="red">Red</label>
 			<input type="radio" name="set_color" value="yellow" id="yellow" ><label for="yellow">Yellow</label>
 			<input type="radio" name="set_color" value="green" id="green" ><label for="green">Green</label>
+			
+			
 		</div>
 	
 	</div>
 </div>
 
 <script>
+
+var socket;
 
 var colors = ["red", "yellow", "green"];
 
@@ -55,16 +62,25 @@ $(function(){
         var color = $("input[name=set_color]:checked").val();
         var v = document.getElementById(color).style.fill = color
     });
+    
+    $("#pause").change( function(){
+        //console.log("#pause", this.checked);
+        socket.send( JSON.stringify({cmd: "pause", value: this.checked} ));
+    });
+    $("#zoom").change( function(){
+        console.log("#zoom", this.value);
+        socket.send( JSON.stringify({cmd: "zoom", value: parseInt(this.value, 10)} ));
+    });    
 });
 
 connect_ws();
 
 function connect_ws(){
-	var socket;
+	
 	var host = "ws://localhost:5678/ws";
 
 	try{
-		var socket = new WebSocket(host);
+		socket = new WebSocket(host);
 
 		console.log('Socket Status: '+socket.readyState);
 
@@ -75,14 +91,16 @@ function connect_ws(){
 		socket.onmessage = function(msg){
                         var obj = JSON.parse(msg.data);
 			
-			console.log(obj);
+			//console.log(obj);
 			if(obj.type == "signal"){
                             
                             for(var i =0; i < colors.length; i++){
                                 document.getElementById(colors[i]).style.fill = "#222222";
                             }
                             var color = obj.state;
-                            document.getElementById(color).style.fill = color    
+                            document.getElementById(color).style.fill = color   
+                            
+                             
 			} else if (obj.type == "time"){
                             $("h1").text(obj.time)
 			
