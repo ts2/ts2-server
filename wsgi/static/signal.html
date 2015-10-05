@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title>TS2 SVG Signal experiment</title>
+	<link rel="stylesheet" href="http://code.jquery.com/mobile/1.4.5/jquery.mobile-1.4.5.min.css" />
+	<script src="http://code.jquery.com/jquery-1.11.1.min.js"></script>
+	<script src="http://code.jquery.com/mobile/1.4.5/jquery.mobile-1.4.5.min.js"></script>
+</head>
+
+<body>
+
+<div data-role="page">
+	<div data-role="header" data-theme="b">
+		<h1>Siganl Demo</h1>
+	</div>
+	<div role="main" class="ui-content">		
+		<svg  xmlns="http://www.w3.org/2000/svg" height="300"
+			xmlns:xlink="http://www.w3.org/1999/xlink">
+			<rect x="0" y="0" 
+			
+					height="300" width="100"
+					rx="20" ry="20"
+					style="stroke:#444444; fill: #222222; stroke-width: 5;"/>
+			
+			<circle cx="50" cy="50" r="30" style="stroke:#444444;	stroke-width: 2;fill:#222222" id="red"/>
+			<circle cx="50" cy="120" r="30" style="stroke:#444444;	stroke-width: 2;fill:#222222" id="yellow"/>
+			<circle cx="50" cy="190" r="30" style="stroke:#444444;	stroke-width: 2;fill:#222222" id="green"/>
+			
+			<text x="50" y="260" font-family="monospace" id="text"
+			style="fill: #dddddd; stroke: none; font-size: 24px; text-anchor: middle">H2301</text>
+		</svg>
+
+	</div>
+	<div data-role="footer">
+		<div data-role="controlgroup" data-type="horizontal">
+			<input type="radio" name="set_color" value="red" id="red" ><label for="red">Red</label>
+			<input type="radio" name="set_color" value="yellow" id="yellow" ><label for="yellow">Yellow</label>
+			<input type="radio" name="set_color" value="green" id="green" ><label for="green">Green</label>
+		</div>
+	
+	</div>
+</div>
+
+<script>
+
+var colors = ["red", "yellow", "green"];
+
+$(function(){
+    $("input[name='set_color']").change( function(){
+        for(var i =0; i < colors.length; i++){
+			document.getElementById(colors[i]).style.fill = "#222222";
+        }
+        var color = $("input[name=set_color]:checked").val();
+        var v = document.getElementById(color).style.fill = color
+    });
+});
+
+connect_ws();
+
+function connect_ws(){
+	var socket;
+	var host = "ws://localhost:5678/ws";
+
+	try{
+		var socket = new WebSocket(host);
+
+		console.log('Socket Status: '+socket.readyState);
+
+		socket.onopen = function(){
+			console.log('Socket Status: '+socket.readyState+' (open)');
+		}
+
+		socket.onmessage = function(msg){
+                        var obj = JSON.parse(msg.data);
+			
+			console.log(obj);
+			if(obj.type == "signal"){
+                            
+                            for(var i =0; i < colors.length; i++){
+                                document.getElementById(colors[i]).style.fill = "#222222";
+                            }
+                            var color = obj.state;
+                            document.getElementById(color).style.fill = color    
+			} else if (obj.type == "time"){
+                            $("h1").text(obj.time)
+			
+			}
+			
+			
+			
+		}
+
+		socket.onclose = function(){
+                    console.log('Socket Status: '+socket.readyState+' (Closed)');
+                    setTimeout(connect_ws, 3000);
+		}			
+
+	} catch(exception){
+		console.log('<p>Error'+exception);
+		 setTimeout(connect_ws, 3000);
+	}
+ }
+ 
+</script>
+
+</body>
+</html>

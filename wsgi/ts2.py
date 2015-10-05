@@ -20,7 +20,7 @@ ALLOWED_IPS = [
     "84.45.225.28"
 ]
 
-app = Flask(__name__)
+app = Flask(__name__, static_url_path='')
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ['OPENSHIFT_POSTGRESQL_DB_URL']
 
 db = SQLAlchemy(app)
